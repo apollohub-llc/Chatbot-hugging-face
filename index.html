@@ -3,33 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Your AI Chatbot - Fixed</title>
+    <title>🤖 Fixed AI Chatbot</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #1a1a2e;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            color: white;
         }
         .chat-container {
             width: 95%;
-            max-width: 800px;
-            height: 85vh;
+            max-width: 700px;
+            height: 80vh;
             background: #16213e;
-            border-radius: 1.5rem;
+            border-radius: 1rem;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4);
+            border: 1px solid #e94560;
         }
         .chat-header {
             background: #0f3460;
-            padding: 1.2rem;
+            padding: 1rem;
             text-align: center;
-            color: white;
             border-bottom: 1px solid #e94560;
         }
         .messages {
@@ -38,40 +38,28 @@
             padding: 1rem;
             display: flex;
             flex-direction: column;
-            gap: 0.8rem;
+            gap: 10px;
         }
         .message {
+            padding: 10px 15px;
+            border-radius: 15px;
             max-width: 80%;
-            padding: 0.8rem 1rem;
-            border-radius: 1.2rem;
-            line-height: 1.4;
             word-wrap: break-word;
+            line-height: 1.5;
         }
-        .user {
-            background: #e94560;
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 0.3rem;
-        }
-        .bot {
-            background: #0f3460;
-            color: #e0e0e0;
-            align-self: flex-start;
-            border-bottom-left-radius: 0.3rem;
-            white-space: pre-wrap;
-        }
+        .user { background: #e94560; align-self: flex-end; }
+        .bot { background: #0f3460; align-self: flex-start; color: #cfd8dc; }
         .input-area {
             padding: 1rem;
             background: #0f3460;
             display: flex;
-            gap: 0.5rem;
-            border-top: 1px solid #e94560;
+            gap: 10px;
         }
         input {
             flex: 1;
-            padding: 0.8rem;
+            padding: 12px;
+            border-radius: 20px;
             border: none;
-            border-radius: 2rem;
             background: #1a1a2e;
             color: white;
             outline: none;
@@ -80,106 +68,116 @@
             background: #e94560;
             color: white;
             border: none;
-            padding: 0.8rem 1.5rem;
-            border-radius: 2rem;
-            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 20px;
             cursor: pointer;
+            font-weight: bold;
         }
-        .status {
-            font-size: 0.75rem;
-            padding: 0.5rem;
-            text-align: center;
-            background: #0f3460;
-            color: #888;
-        }
+        button:disabled { opacity: 0.5; }
+        .status { font-size: 0.7rem; text-align: center; padding: 5px; color: #888; }
     </style>
 </head>
 <body>
+
 <div class="chat-container">
     <div class="chat-header">
-        <h1>🤖 AI Assistant</h1>
-        <p>Microsoft Phi-2 • Powered by Hugging Face</p>
+        <h2>AI Assistant</h2>
+        <p style="font-size: 0.8rem; opacity: 0.7;">Powered by Phi-2</p>
     </div>
-    <div class="messages" id="messages">
-        <div class="message bot">👋 Hello! How can I help you today?</div>
+    <div class="messages" id="chatBox">
+        <div class="message bot">👋 Hello! I'm ready to chat. (If it fails first try, the model might be waking up!)</div>
     </div>
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Type a message..." autofocus>
+        <input type="text" id="userInput" placeholder="Ask me something..." autocomplete="off">
         <button id="sendBtn">Send</button>
     </div>
-    <div id="status" class="status">✅ Connection Ready</div>
+    <div id="statusLabel" class="status">✅ System Ready</div>
 </div>
 
 <script>
-    // Configuration
+    // 1. CONFIGURATION
     const HF_TOKEN = "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";
-    const API_URL = "https://api-inference.huggingface.co/models/microsoft/phi-2";
-    
-    const messagesDiv = document.getElementById('messages');
+    // Using the Netlify proxy path we created in _redirects
+    const API_URL = "/api/"; 
+
+    const chatBox = document.getElementById('chatBox');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
-    const statusDiv = document.getElementById('status');
-    
-    function addMessage(text, isUser) {
+    const statusLabel = document.getElementById('statusLabel');
+
+    function appendMessage(text, type) {
         const msg = document.createElement('div');
-        msg.className = `message ${isUser ? 'user' : 'bot'}`;
+        msg.className = `message ${type}`;
         msg.textContent = text;
-        messagesDiv.appendChild(msg);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    async function query(data) {
-        const response = await fetch(API_URL, {
-            headers: { 
-                "Authorization": `Bearer ${HF_TOKEN}`,
-                "Content-Type": "application/json"
-            },
-            method: "POST",
-            body: JSON.stringify(data),
-        });
-        
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || "Failed to connect to AI");
-        }
-        return await response.json();
-    }
-
-    async function handleSend() {
-        const text = userInput.value.trim();
-        if (!text) return;
-
-        addMessage(text, true);
-        userInput.value = '';
-        statusDiv.textContent = "⏳ AI is thinking...";
-
+    async function callAI(prompt, retryCount = 0) {
         try {
-            const result = await query({
-                inputs: text,
-                parameters: {
-                    max_new_tokens: 150,
-                    temperature: 0.7,
-                    return_full_text: false
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${HF_TOKEN}`,
+                    "Content-Type": "application/json"
                 },
-                options: {
-                    wait_for_model: true,
-                    use_cache: true
-                }
+                body: JSON.stringify({
+                    inputs: prompt,
+                    parameters: { max_new_tokens: 150, temperature: 0.7 },
+                    options: { wait_for_model: true }
+                })
             });
 
-            const reply = result[0]?.generated_text || "I couldn't generate a response.";
-            addMessage(reply.trim(), false);
-            statusDiv.textContent = "✅ Ready";
-        } catch (error) {
-            addMessage("❌ Error: " + error.message, false);
-            statusDiv.textContent = "❌ Connection Error";
+            const data = await response.json();
+
+            // Handle "Model Loading" error specifically
+            if (response.status === 503 || (data.error && data.error.includes("loading"))) {
+                if (retryCount < 3) {
+                    statusLabel.textContent = `⏳ Model is waking up... Retrying (Attempt ${retryCount + 1})`;
+                    await new Promise(r => setTimeout(r, 5000)); // Wait 5 seconds
+                    return callAI(prompt, retryCount + 1);
+                } else {
+                    throw new Error("Model took too long to load. Try again in a minute.");
+                }
+            }
+
+            if (!response.ok) throw new Error(data.error || "API Connection Failed");
+
+            return data[0].generated_text;
+
+        } catch (err) {
+            console.error(err);
+            throw err;
         }
     }
 
-    sendBtn.addEventListener('click', handleSend);
-    userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleSend();
-    });
+    async function handleChat() {
+        const message = userInput.value.trim();
+        if (!message) return;
+
+        appendMessage(message, 'user');
+        userInput.value = '';
+        userInput.disabled = true;
+        sendBtn.disabled = true;
+        statusLabel.textContent = "🤔 AI is thinking...";
+
+        try {
+            const reply = await callAI(message);
+            appendMessage(reply.trim(), 'bot');
+            statusLabel.textContent = "✅ Ready";
+        } catch (error) {
+            appendMessage("❌ Error: " + error.message, 'bot');
+            statusLabel.textContent = "❌ Connection Failed";
+        } finally {
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+        }
+    }
+
+    sendBtn.addEventListener('click', handleChat);
+    userInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleChat(); });
 </script>
+
 </body>
 </html>
