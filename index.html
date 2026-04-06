@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Local AI Chatbot</title>
+    <title>🤖 AI Chatbot - CORS Fixed</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -29,6 +29,7 @@
             padding: 1rem;
             text-align: center;
             color: white;
+            border-bottom: 1px solid #e94560;
         }
         .messages {
             flex: 1;
@@ -42,6 +43,7 @@
             max-width: 75%;
             padding: 0.8rem 1rem;
             border-radius: 1.2rem;
+            word-wrap: break-word;
         }
         .user {
             background: #e94560;
@@ -58,6 +60,7 @@
             background: #0f3460;
             display: flex;
             gap: 0.5rem;
+            border-top: 1px solid #e94560;
         }
         input {
             flex: 1;
@@ -75,6 +78,7 @@
             border: none;
             padding: 0.8rem 1.5rem;
             border-radius: 2rem;
+            font-weight: bold;
             cursor: pointer;
         }
         .status {
@@ -84,102 +88,124 @@
             background: #0a0f1c;
             color: #ff9d00;
         }
+        .status.ready { background: #0a5c2e; color: white; }
+        .status.error { background: #8b0000; color: white; }
     </style>
 </head>
 <body>
 <div class="chat-container">
     <div class="chat-header">
-        <h1>🤖 Local AI Chatbot</h1>
-        <p>100% in your browser • No API • No CORS</p>
+        <h1>🤖 AI Chatbot</h1>
+        <p>CORS Proxy Enabled</p>
     </div>
     <div class="messages" id="messages">
-        <div class="message bot">👋 Loading AI model... (one-time download, then cached)</div>
+        <div class="message bot">👋 Hi! Ask me anything.</div>
     </div>
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Type your message..." disabled>
-        <button id="sendBtn" disabled>Send</button>
+        <input type="text" id="userInput" placeholder="Type your message..." autofocus>
+        <button id="sendBtn">Send</button>
     </div>
-    <div class="status" id="status">⏳ Downloading model...</div>
+    <div class="status" id="status">✅ Ready</div>
 </div>
 
-<script type="importmap">
-    {
-        "imports": {
-            "@huggingface/transformers": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0"
-        }
-    }
-</script>
-
-<script type="module">
-    import { pipeline } from '@huggingface/transformers';
+<script>
+    const HF_TOKEN = "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";
     
-    let generator = null;
+    // ✅ Using CORS proxy (corsproxy.io is free, no API key needed)
+    const PROXY = "https://corsproxy.io/?";
+    const API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3";
+    
     const messagesDiv = document.getElementById('messages');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
     const statusDiv = document.getElementById('status');
     
-    // Load smaller model for faster download (~500MB, but runs locally)
-    async function loadModel() {
-        try {
-            statusDiv.innerHTML = "📦 Downloading AI model (first time only)...";
-            generator = await pipeline('text-generation', 'Xenova/TinyLlama-1.1B-Chat-v1.0');
-            statusDiv.innerHTML = "✅ Ready! Model loaded locally.";
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-            messagesDiv.innerHTML = '<div class="message bot">👋 Hi! Ask me anything. I run entirely in your browser.</div>';
-        } catch (err) {
-            statusDiv.innerHTML = "❌ Error: " + err.message;
-        }
-    }
+    let isLoading = false;
     
     function addMessage(text, isUser) {
-        const msg = document.createElement('div');
-        msg.className = `message ${isUser ? 'user' : 'bot'}`;
-        msg.textContent = text;
-        messagesDiv.appendChild(msg);
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+        messageDiv.textContent = text;
+        messagesDiv.appendChild(messageDiv);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function addTypingIndicator() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'message bot';
+        typingDiv.textContent = '🤔 Thinking...';
+        typingDiv.id = 'typing-indicator';
+        messagesDiv.appendChild(typingDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function removeTypingIndicator() {
+        const typing = document.getElementById('typing-indicator');
+        if (typing) typing.remove();
     }
     
     async function sendMessage() {
         const userMessage = userInput.value.trim();
-        if (!userMessage || !generator) return;
+        if (!userMessage || isLoading) return;
         
-        addMessage(userMessage, true);
-        userInput.value = '';
         userInput.disabled = true;
         sendBtn.disabled = true;
-        
-        const typing = document.createElement('div');
-        typing.className = 'message bot';
-        typing.textContent = '🤔 Thinking...';
-        typing.id = 'typing';
-        messagesDiv.appendChild(typing);
+        addMessage(userMessage, true);
+        userInput.value = '';
+        addTypingIndicator();
+        isLoading = true;
         
         try {
-            const response = await generator(`<|user|>\n${userMessage}\n<|assistant|>\n`, {
-                max_new_tokens: 150,
-                temperature: 0.7
+            // Request goes through proxy to bypass CORS
+            const response = await fetch(`${PROXY}${encodeURIComponent(API_URL)}`, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${HF_TOKEN}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    inputs: `<s>[INST] ${userMessage} [/INST]`,
+                    parameters: {
+                        max_new_tokens: 300,
+                        temperature: 0.7
+                    }
+                })
             });
-            document.getElementById('typing')?.remove();
-            let reply = response[0].generated_text.split('<|assistant|>\n')[1] || "Sorry, no response.";
-            addMessage(reply, false);
-        } catch (err) {
-            document.getElementById('typing')?.remove();
-            addMessage("Error: " + err.message, false);
+            
+            removeTypingIndicator();
+            
+            if (response.status === 503) {
+                throw new Error("Model is loading. Try again in 10 seconds.");
+            }
+            
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}`);
+            }
+            
+            const result = await response.json();
+            let botReply = result[0]?.generated_text || "No response.";
+            botReply = botReply.replace(`<s>[INST] ${userMessage} [/INST]`, '').trim();
+            
+            addMessage(botReply, false);
+            statusDiv.className = "status ready";
+            
+        } catch (error) {
+            removeTypingIndicator();
+            addMessage(`❌ ${error.message}`, false);
+            statusDiv.className = "status error";
+            statusDiv.textContent = error.message;
+        } finally {
+            isLoading = false;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
         }
-        
-        userInput.disabled = false;
-        sendBtn.disabled = false;
-        userInput.focus();
     }
     
     sendBtn.addEventListener('click', sendMessage);
     userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !userInput.disabled) sendMessage();
+        if (e.key === 'Enter') sendMessage();
     });
-    
-    loadModel();
 </script>
 </body>
 </html>
