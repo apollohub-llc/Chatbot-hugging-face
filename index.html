@@ -48,7 +48,7 @@
             line-height: 1.5;
         }
         .user { background: #e94560; align-self: flex-end; }
-        .bot { background: #0f3460; align-self: flex-start; color: #cfd8dc; }
+        .bot { background: #0f3460; align-self: flex-start; color: #cfd8dc; white-space: pre-wrap; }
         .input-area {
             padding: 1rem;
             background: #0f3460;
@@ -85,7 +85,7 @@
         <p style="font-size: 0.8rem; opacity: 0.7;">Powered by Phi-2</p>
     </div>
     <div class="messages" id="chatBox">
-        <div class="message bot">👋 Hello! I'm ready to chat. (If it fails first try, the model might be waking up!)</div>
+        <div class="message bot">👋 New token active! I'm ready to chat.</div>
     </div>
     <div class="input-area">
         <input type="text" id="userInput" placeholder="Ask me something..." autocomplete="off">
@@ -95,9 +95,8 @@
 </div>
 
 <script>
-    // 1. CONFIGURATION
-    const HF_TOKEN = "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";
-    // Using the Netlify proxy path we created in _redirects
+    // 1. CONFIGURATION (Updated Token)
+    const HF_TOKEN = "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";
     const API_URL = "/api/"; 
 
     const chatBox = document.getElementById('chatBox');
@@ -123,27 +122,42 @@
                 },
                 body: JSON.stringify({
                     inputs: prompt,
-                    parameters: { max_new_tokens: 150, temperature: 0.7 },
-                    options: { wait_for_model: true }
+                    parameters: { 
+                        max_new_tokens: 150, 
+                        temperature: 0.7,
+                        return_full_text: false 
+                    },
+                    options: { 
+                        wait_for_model: true,
+                        use_cache: true 
+                    }
                 })
             });
 
             const data = await response.json();
 
-            // Handle "Model Loading" error specifically
+            // Handle Model Loading (503)
             if (response.status === 503 || (data.error && data.error.includes("loading"))) {
-                if (retryCount < 3) {
-                    statusLabel.textContent = `⏳ Model is waking up... Retrying (Attempt ${retryCount + 1})`;
-                    await new Promise(r => setTimeout(r, 5000)); // Wait 5 seconds
+                if (retryCount < 5) {
+                    statusLabel.textContent = `⏳ AI is waking up... Attempt ${retryCount + 1}/5`;
+                    await new Promise(r => setTimeout(r, 6000)); 
                     return callAI(prompt, retryCount + 1);
                 } else {
-                    throw new Error("Model took too long to load. Try again in a minute.");
+                    throw new Error("The AI is taking too long to wake up. Please try again in 30 seconds.");
                 }
             }
 
-            if (!response.ok) throw new Error(data.error || "API Connection Failed");
+            if (!response.ok) throw new Error(data.error || "Connection Failed");
 
-            return data[0].generated_text;
+            // Parse response
+            let reply = "";
+            if (Array.isArray(data)) {
+                reply = data[0].generated_text;
+            } else {
+                reply = data.generated_text;
+            }
+
+            return reply || "I couldn't think of a response.";
 
         } catch (err) {
             console.error(err);
@@ -166,8 +180,8 @@
             appendMessage(reply.trim(), 'bot');
             statusLabel.textContent = "✅ Ready";
         } catch (error) {
-            appendMessage("❌ Error: " + error.message, 'bot');
-            statusLabel.textContent = "❌ Connection Failed";
+            appendMessage("❌ " + error.message, 'bot');
+            statusLabel.textContent = "❌ Error Occurred";
         } finally {
             userInput.disabled = false;
             sendBtn.disabled = false;
