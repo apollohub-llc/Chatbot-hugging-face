@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Your AI Chatbot - Working!</title>
+    <title>🤖 Your AI Chatbot - Fixed</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -15,7 +15,7 @@
             align-items: center;
         }
         .chat-container {
-            width: 90%;
+            width: 95%;
             max-width: 800px;
             height: 85vh;
             background: #16213e;
@@ -32,8 +32,6 @@
             color: white;
             border-bottom: 1px solid #e94560;
         }
-        .chat-header h1 { font-size: 1.4rem; }
-        .chat-header p { font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem; }
         .messages {
             flex: 1;
             overflow-y: auto;
@@ -43,7 +41,7 @@
             gap: 0.8rem;
         }
         .message {
-            max-width: 75%;
+            max-width: 80%;
             padding: 0.8rem 1rem;
             border-radius: 1.2rem;
             line-height: 1.4;
@@ -60,6 +58,7 @@
             color: #e0e0e0;
             align-self: flex-start;
             border-bottom-left-radius: 0.3rem;
+            white-space: pre-wrap;
         }
         .input-area {
             padding: 1rem;
@@ -75,7 +74,6 @@
             border-radius: 2rem;
             background: #1a1a2e;
             color: white;
-            font-size: 1rem;
             outline: none;
         }
         button {
@@ -86,56 +84,35 @@
             border-radius: 2rem;
             font-weight: bold;
             cursor: pointer;
-            transition: transform 0.1s;
-        }
-        button:active { transform: scale(0.97); }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
         .status {
             font-size: 0.75rem;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem;
             text-align: center;
-            background: #0a5c2e;
-            color: white;
+            background: #0f3460;
+            color: #888;
         }
-        .status.error {
-            background: #8b0000;
-            color: white;
-        }
-        .status.loading {
-            background: #1a3a5c;
-            color: white;
-        }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f3460; }
-        ::-webkit-scrollbar-thumb { background: #e94560; border-radius: 3px; }
     </style>
 </head>
 <body>
 <div class="chat-container">
     <div class="chat-header">
-        <h1>🤖 Your AI Chatbot</h1>
-        <p>Powered by Hugging Face • Microsoft Phi-2</p>
+        <h1>🤖 AI Assistant</h1>
+        <p>Microsoft Phi-2 • Powered by Hugging Face</p>
     </div>
     <div class="messages" id="messages">
-        <div class="message bot">👋 Hey! I'm your AI assistant. Ask me anything!</div>
+        <div class="message bot">👋 Hello! How can I help you today?</div>
     </div>
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Type your message and press Enter..." autofocus>
+        <input type="text" id="userInput" placeholder="Type a message..." autofocus>
         <button id="sendBtn">Send</button>
     </div>
-    <div class="status" id="status">✅ Ready to chat!</div>
+    <div id="status" class="status">✅ Connection Ready</div>
 </div>
 
 <script>
-    // ============================================
-    // YOUR NEW TOKEN IS INSERTED HERE
-    // ============================================
+    // Configuration
     const HF_TOKEN = "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";
-    
-    // Using Microsoft Phi-2 (works great, no special permissions needed)
     const API_URL = "https://api-inference.huggingface.co/models/microsoft/phi-2";
     
     const messagesDiv = document.getElementById('messages');
@@ -143,119 +120,65 @@
     const sendBtn = document.getElementById('sendBtn');
     const statusDiv = document.getElementById('status');
     
-    let isLoading = false;
-    
     function addMessage(text, isUser) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-        messageDiv.textContent = text;
-        messagesDiv.appendChild(messageDiv);
+        const msg = document.createElement('div');
+        msg.className = `message ${isUser ? 'user' : 'bot'}`;
+        msg.textContent = text;
+        messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
-    
-    function addTypingIndicator() {
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'message bot';
-        typingDiv.textContent = '🤔 Thinking...';
-        typingDiv.id = 'typing-indicator';
-        messagesDiv.appendChild(typingDiv);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-    
-    function removeTypingIndicator() {
-        const typing = document.getElementById('typing-indicator');
-        if (typing) typing.remove();
-    }
-    
-    async function sendMessage() {
-        const userMessage = userInput.value.trim();
-        if (!userMessage || isLoading) return;
+
+    async function query(data) {
+        const response = await fetch(API_URL, {
+            headers: { 
+                "Authorization": `Bearer ${HF_TOKEN}`,
+                "Content-Type": "application/json"
+            },
+            method: "POST",
+            body: JSON.stringify(data),
+        });
         
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || "Failed to connect to AI");
+        }
+        return await response.json();
+    }
+
+    async function handleSend() {
+        const text = userInput.value.trim();
+        if (!text) return;
+
+        addMessage(text, true);
         userInput.value = '';
-        userInput.disabled = true;
-        sendBtn.disabled = true;
-        
-        addMessage(userMessage, true);
-        addTypingIndicator();
-        isLoading = true;
-        statusDiv.textContent = "⏳ Calling API...";
-        statusDiv.className = "status loading";
-        
+        statusDiv.textContent = "⏳ AI is thinking...";
+
         try {
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${HF_TOKEN}`,
-                    "Content-Type": "application/json"
+            const result = await query({
+                inputs: text,
+                parameters: {
+                    max_new_tokens: 150,
+                    temperature: 0.7,
+                    return_full_text: false
                 },
-                body: JSON.stringify({
-                    inputs: userMessage,
-                    parameters: {
-                        max_new_tokens: 200,
-                        temperature: 0.7,
-                        return_full_text: false
-                    }
-                })
+                options: {
+                    wait_for_model: true,
+                    use_cache: true
+                }
             });
-            
-            removeTypingIndicator();
-            
-            if (response.status === 401) {
-                throw new Error("Invalid token. Create a new READ token.");
-            }
-            
-            if (response.status === 403) {
-                throw new Error("Token access denied. Visit https://huggingface.co/microsoft/phi-2 and click 'Agree and access repository'");
-            }
-            
-            if (response.status === 429) {
-                throw new Error("Rate limit exceeded. Free tier: ~30 requests/hour. Wait a moment.");
-            }
-            
-            if (response.status === 503) {
-                throw new Error("Model is loading. Try again in 10 seconds.");
-            }
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText.substring(0, 100)}`);
-            }
-            
-            const result = await response.json();
-            
-            let botReply = "";
-            if (Array.isArray(result) && result[0] && result[0].generated_text) {
-                botReply = result[0].generated_text;
-            } else if (result.generated_text) {
-                botReply = result.generated_text;
-            } else {
-                botReply = "I received a response but couldn't parse it. Please try again.";
-            }
-            
-            if (!botReply || botReply.trim() === "") {
-                botReply = "I'm not sure how to respond to that. Could you rephrase?";
-            }
-            
-            addMessage(botReply, false);
+
+            const reply = result[0]?.generated_text || "I couldn't generate a response.";
+            addMessage(reply.trim(), false);
             statusDiv.textContent = "✅ Ready";
-            statusDiv.className = "status";
-            
         } catch (error) {
-            removeTypingIndicator();
-            addMessage(`❌ ${error.message}`, false);
-            statusDiv.textContent = `❌ ${error.message}`;
-            statusDiv.className = "status error";
-        } finally {
-            isLoading = false;
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-            userInput.focus();
+            addMessage("❌ Error: " + error.message, false);
+            statusDiv.textContent = "❌ Connection Error";
         }
     }
-    
-    sendBtn.addEventListener('click', sendMessage);
+
+    sendBtn.addEventListener('click', handleSend);
     userInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
+        if (e.key === 'Enter') handleSend();
     });
 </script>
 </body>
