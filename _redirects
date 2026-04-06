@@ -1,0 +1,2 @@
+/api/* https://api-inference.huggingface.co/models/microsoft/phi-2/:splat  200
+
