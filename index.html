@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 AI Chatbot - CORS Fixed</title>
+    <title>🤖 Your AI Chatbot - Working!</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: #1a1a2e;
             height: 100vh;
             display: flex;
@@ -23,14 +23,17 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.4);
         }
         .chat-header {
             background: #0f3460;
-            padding: 1rem;
+            padding: 1.2rem;
             text-align: center;
             color: white;
             border-bottom: 1px solid #e94560;
         }
+        .chat-header h1 { font-size: 1.4rem; }
+        .chat-header p { font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem; }
         .messages {
             flex: 1;
             overflow-y: auto;
@@ -43,17 +46,20 @@
             max-width: 75%;
             padding: 0.8rem 1rem;
             border-radius: 1.2rem;
+            line-height: 1.4;
             word-wrap: break-word;
         }
         .user {
             background: #e94560;
             color: white;
             align-self: flex-end;
+            border-bottom-right-radius: 0.3rem;
         }
         .bot {
             background: #0f3460;
             color: #e0e0e0;
             align-self: flex-start;
+            border-bottom-left-radius: 0.3rem;
         }
         .input-area {
             padding: 1rem;
@@ -80,40 +86,57 @@
             border-radius: 2rem;
             font-weight: bold;
             cursor: pointer;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.97); }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         .status {
             font-size: 0.75rem;
-            padding: 0.5rem;
+            padding: 0.5rem 1rem;
             text-align: center;
-            background: #0a0f1c;
-            color: #ff9d00;
+            background: #0a5c2e;
+            color: white;
         }
-        .status.ready { background: #0a5c2e; color: white; }
-        .status.error { background: #8b0000; color: white; }
+        .status.error {
+            background: #8b0000;
+            color: white;
+        }
+        .status.loading {
+            background: #1a3a5c;
+            color: white;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f3460; }
+        ::-webkit-scrollbar-thumb { background: #e94560; border-radius: 3px; }
     </style>
 </head>
 <body>
 <div class="chat-container">
     <div class="chat-header">
-        <h1>🤖 AI Chatbot</h1>
-        <p>CORS Proxy Enabled</p>
+        <h1>🤖 Your AI Chatbot</h1>
+        <p>Powered by Hugging Face • Microsoft Phi-2</p>
     </div>
     <div class="messages" id="messages">
-        <div class="message bot">👋 Hi! Ask me anything.</div>
+        <div class="message bot">👋 Hey! I'm your AI assistant. Ask me anything!</div>
     </div>
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Type your message..." autofocus>
+        <input type="text" id="userInput" placeholder="Type your message and press Enter..." autofocus>
         <button id="sendBtn">Send</button>
     </div>
-    <div class="status" id="status">✅ Ready</div>
+    <div class="status" id="status">✅ Ready to chat!</div>
 </div>
 
 <script>
-    const HF_TOKEN = "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";
+    // ============================================
+    // YOUR NEW TOKEN IS INSERTED HERE
+    // ============================================
+    const HF_TOKEN = "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";
     
-    // ✅ Using CORS proxy (corsproxy.io is free, no API key needed)
-    const PROXY = "https://corsproxy.io/?";
-    const API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3";
+    // Using Microsoft Phi-2 (works great, no special permissions needed)
+    const API_URL = "https://api-inference.huggingface.co/models/microsoft/phi-2";
     
     const messagesDiv = document.getElementById('messages');
     const userInput = document.getElementById('userInput');
@@ -148,52 +171,80 @@
         const userMessage = userInput.value.trim();
         if (!userMessage || isLoading) return;
         
+        userInput.value = '';
         userInput.disabled = true;
         sendBtn.disabled = true;
+        
         addMessage(userMessage, true);
-        userInput.value = '';
         addTypingIndicator();
         isLoading = true;
+        statusDiv.textContent = "⏳ Calling API...";
+        statusDiv.className = "status loading";
         
         try {
-            // Request goes through proxy to bypass CORS
-            const response = await fetch(`${PROXY}${encodeURIComponent(API_URL)}`, {
+            const response = await fetch(API_URL, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${HF_TOKEN}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    inputs: `<s>[INST] ${userMessage} [/INST]`,
+                    inputs: userMessage,
                     parameters: {
-                        max_new_tokens: 300,
-                        temperature: 0.7
+                        max_new_tokens: 200,
+                        temperature: 0.7,
+                        return_full_text: false
                     }
                 })
             });
             
             removeTypingIndicator();
             
+            if (response.status === 401) {
+                throw new Error("Invalid token. Create a new READ token.");
+            }
+            
+            if (response.status === 403) {
+                throw new Error("Token access denied. Visit https://huggingface.co/microsoft/phi-2 and click 'Agree and access repository'");
+            }
+            
+            if (response.status === 429) {
+                throw new Error("Rate limit exceeded. Free tier: ~30 requests/hour. Wait a moment.");
+            }
+            
             if (response.status === 503) {
                 throw new Error("Model is loading. Try again in 10 seconds.");
             }
             
             if (!response.ok) {
-                throw new Error(`Error ${response.status}`);
+                const errorText = await response.text();
+                throw new Error(`Error ${response.status}: ${errorText.substring(0, 100)}`);
             }
             
             const result = await response.json();
-            let botReply = result[0]?.generated_text || "No response.";
-            botReply = botReply.replace(`<s>[INST] ${userMessage} [/INST]`, '').trim();
+            
+            let botReply = "";
+            if (Array.isArray(result) && result[0] && result[0].generated_text) {
+                botReply = result[0].generated_text;
+            } else if (result.generated_text) {
+                botReply = result.generated_text;
+            } else {
+                botReply = "I received a response but couldn't parse it. Please try again.";
+            }
+            
+            if (!botReply || botReply.trim() === "") {
+                botReply = "I'm not sure how to respond to that. Could you rephrase?";
+            }
             
             addMessage(botReply, false);
-            statusDiv.className = "status ready";
+            statusDiv.textContent = "✅ Ready";
+            statusDiv.className = "status";
             
         } catch (error) {
             removeTypingIndicator();
             addMessage(`❌ ${error.message}`, false);
+            statusDiv.textContent = `❌ ${error.message}`;
             statusDiv.className = "status error";
-            statusDiv.textContent = error.message;
         } finally {
             isLoading = false;
             userInput.disabled = false;
